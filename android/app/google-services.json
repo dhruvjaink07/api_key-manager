@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "69394371572",
+    "project_id": "api-key-manager-81047",
+    "storage_bucket": "api-key-manager-81047.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:69394371572:android:04466efbeeae9329779fa1",
+        "android_client_info": {
+          "package_name": "com.example.apikey_manager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAgmPDO-r2Q_GQ_cWLxQ60aBOVeQA5mCFs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
