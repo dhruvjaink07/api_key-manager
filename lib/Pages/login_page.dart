@@ -13,7 +13,9 @@ class _LoginPageState extends State<LoginPage> {
   // Function to handle Login
   Future<void> loginUser(String email, String password) async {
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+          email: email, password: password);
+      print(userCredential.user?.email);
       Navigator.pushReplacement(
           context, MaterialPageRoute(builder: (context) => const HomePage()));
     } catch (e) {
