@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'dart:convert';
+import 'package:apikey_manager/Pages/APICard.dart';
+import 'package:apikey_manager/Pages/ApiMap.dart';
 import 'package:apikey_manager/Pages/login_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -18,10 +20,72 @@ class _HomePageState extends State<HomePage> {
   TextEditingController API_KEY = TextEditingController();
   final List<ApiMap> keys = [];
 
+  void storeKeysInFireStore(List<ApiMap> keys) async {
+    try {
+      // Get current User's ID
+      String userId = FirebaseAuth.instance.currentUser!.uid;
+
+      // Reference User to Document's Database
+      DocumentReference userDocument =
+          FirebaseFirestore.instance.collection("users").doc(userId);
+
+      // Converts the Keys list to Map
+      List<Map<String, dynamic>> keysData =
+          keys.map((apiMap) => apiMap.toJson()).toList();
+
+      // Update user document
+      await userDocument.set(
+          {"keys": FieldValue.arrayUnion(keysData)}, SetOptions(merge: true));
+    } catch (e) {
+      print("Error is " + e.toString());
+    }
+  }
+
+  void readKeysData() async {
+    try {
+      String userId = FirebaseAuth.instance.currentUser!.uid;
+
+      DocumentReference userDocs =
+          FirebaseFirestore.instance.collection("users").doc(userId);
+
+      DocumentSnapshot dataSnapshot = await userDocs.get();
+
+      if (dataSnapshot.exists) {
+        Map<String, dynamic> apiData =
+            dataSnapshot.data() as Map<String, dynamic>;
+
+        List<Map<String, dynamic>> keysData = (apiData['keys'] as List<dynamic>)
+            .map((item) => item as Map<String, dynamic>)
+            .toList();
+
+        print('API Data from Firestore: $apiData');
+        print('Keys Data from Firestore: $keysData');
+
+        setState(() {
+          keys.clear(); // Clear the existing keys
+          keys.addAll(keysData.map((map) => ApiMap.fromJson(map)));
+        });
+
+        print(
+            'Keys List after updating: ${keys.map((apiMap) => apiMap.toJson()).toList()}');
+      } else {
+        print('Document does not exist for user: $userId');
+      }
+    } catch (e) {
+      print("Error in readKeysData: $e");
+    }
+  }
+
+// Modify initState to call the updated method
+  @override
+  void initState() {
+    super.initState();
+    readKeysData();
+  }
+
   @override
   Widget build(BuildContext context) {
     // Debug statement
-    print('Keys List: ${keys.map((apiMap) => apiMap.toJson()).toList()}');
 
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
@@ -75,7 +139,8 @@ class _HomePageState extends State<HomePage> {
             child: ListView.builder(
               itemCount: keys.length,
               itemBuilder: (BuildContext context, int index) {
-                return _buildCard(keys[index].apiName, keys[index].apiKey);
+                return APICard(
+                    apiName: keys[index].apiName, apiKey: keys[index].apiKey);
               },
             ),
           ),
@@ -93,112 +158,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Function to build a card widget
-  Widget _buildCard(String apiName, String apiKey) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.purple, Colors.purpleAccent],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(15),
-          bottomRight: Radius.circular(15),
-        ),
-      ),
-      margin: const EdgeInsets.all(10),
-      padding: const EdgeInsets.all(7),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.5),
-                    spreadRadius: 2,
-                    blurRadius: 5,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  apiName,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                    shadows: [
-                      Shadow(
-                        color: Colors.grey,
-                        offset: Offset(1, 1),
-                        blurRadius: 2,
-                      ),
-                    ],
-                  ),
-                  softWrap: true,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.5),
-                    spreadRadius: 2,
-                    blurRadius: 5,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  apiKey,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                    shadows: [
-                      Shadow(
-                        color: Colors.grey,
-                        offset: Offset(1, 1),
-                        blurRadius: 2,
-                      ),
-                    ],
-                  ),
-                  softWrap: true,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.only(left: 8),
-            child: IconButton(
-              onPressed: () {
-                // Handle copy button action
-                Clipboard.setData(ClipboardData(text: apiKey));
-              },
-              icon: const Icon(Icons.copy),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Function to show add key dialog
   Future<void> _AddKeyDialog(
     BuildContext context,
     TextEditingController ed1,
@@ -210,17 +169,30 @@ class _HomePageState extends State<HomePage> {
     }
 
     // Function to store the key
-    void storeKey() {
-      ApiMap apiMap = ApiMap(apiKey: ed2.text, apiName: ed1.text);
-      String apiMapJson = jsonEncode(apiMap.toJson());
-      setState(() {
-        keys.insert(0, apiMap);
-      });
-      clearText();
-      // Debug statement
-      print('API Map JSON: $apiMapJson');
-      print(
-          'Keys List after adding: ${keys.map((apiMap) => apiMap.toJson()).toList()}');
+    Future<void> storeKey() async {
+      if (FirebaseAuth.instance.currentUser != null) {
+        // Proceed to store data
+        ApiMap apiMap = ApiMap(apiKey: ed2.text, apiName: ed1.text);
+        String apiMapJson = jsonEncode(apiMap.toJson());
+
+        setState(() {
+          keys.insert(0, apiMap);
+        });
+
+        clearText();
+
+        // Debug statement
+        print('API Map JSON: $apiMapJson');
+        print(
+            'Keys List after adding: ${keys.map((apiMap) => apiMap.toJson()).toList()}');
+
+        // Call Firestore function to store data and wait for completion
+        storeKeysInFireStore([apiMap]); // Pass only the newly added key
+        Navigator.of(context).pop();
+      } else {
+        print('User is not authenticated.');
+        // You may want to handle this case, e.g., show an error message.
+      }
     }
 
     return showDialog<void>(
@@ -245,7 +217,8 @@ class _HomePageState extends State<HomePage> {
                       style: TextStyle(fontSize: 15),
                     ),
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(3)),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -260,7 +233,8 @@ class _HomePageState extends State<HomePage> {
                       style: TextStyle(fontSize: 15),
                     ),
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(3)),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
                   ),
                 ),
               ],
@@ -282,9 +256,8 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                storeKey();
+              onPressed: () async {
+                await storeKey(); // Await the completion of storeKey
               },
               style: TextButton.styleFrom(
                 textStyle: Theme.of(context).textTheme.labelLarge,
@@ -302,23 +275,5 @@ class _HomePageState extends State<HomePage> {
         );
       },
     );
-  }
-}
-
-class ApiMap {
-  final String apiName;
-  final String apiKey;
-
-  ApiMap({
-    required this.apiName,
-    required this.apiKey,
-  });
-
-  // Method to convert instance to JSON
-  Map<String, dynamic> toJson() {
-    return {
-      'apiName': apiName,
-      'apiKey': apiKey,
-    };
   }
 }

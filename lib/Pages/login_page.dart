@@ -17,7 +17,7 @@ class _LoginPageState extends State<LoginPage> {
           email: email, password: password);
       print(userCredential.user?.email);
       Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (context) => const HomePage()));
+          context, MaterialPageRoute(builder: (context) => HomePage()));
     } catch (e) {
       print('Error: $e');
       // Handle other errors
